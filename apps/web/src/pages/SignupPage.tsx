@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import {
   UserPlus,
   Users,
@@ -21,8 +21,15 @@ import { DementiaStage, RegionalLanguage, SUPPORTED_LANGUAGES } from '@ner/types
 export const SignupPage: React.FC = () => {
   const { registerCaretaker, registerDoctor, registerPatientByCaretaker, getRoleHomeUrl } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const initialRoleParam = searchParams.get('role');
 
-  const [activeTab, setActiveTab] = useState<'caretaker' | 'patient' | 'doctor'>('caretaker');
+  const [activeTab, setActiveTab] = useState<'caretaker' | 'patient' | 'doctor'>(() => {
+    if (initialRoleParam === 'patient' || initialRoleParam === 'doctor' || initialRoleParam === 'caretaker') {
+      return initialRoleParam;
+    }
+    return 'caretaker';
+  });
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -36,7 +43,7 @@ export const SignupPage: React.FC = () => {
 
   // Caretaker specific fields
   const [relationship, setRelationship] = useState('Daughter/Son');
-  const [caretakerMode, setCaretakerMode] = useState<'new_patient' | 'link_code' | 'none'>('new_patient');
+  const [caretakerMode, setCaretakerMode] = useState<'create_new' | 'join_existing' | 'none'>('create_new');
   const [inviteCode, setInviteCode] = useState('');
 
   // Patient profile fields
@@ -64,16 +71,18 @@ export const SignupPage: React.FC = () => {
           password,
           preferredLanguage,
           relationship,
-          ...(caretakerMode === 'link_code' ? { inviteCode } : {}),
-          ...(caretakerMode === 'new_patient'
+          patientOption: caretakerMode !== 'none' ? caretakerMode : undefined,
+          ...(caretakerMode === 'join_existing' ? { inviteCode } : {}),
+          ...(caretakerMode === 'create_new'
             ? {
-                patientData: {
+                patientDetails: {
                   name: patientName || `${name}'s Parent/Ward`,
-                  phone: phone, // Can use caretaker's or patient phone
+                  phone: phone,
                   dateOfBirth: patientDob,
                   dementiaStage,
                   emergencyContact: emergencyContact || phone,
                   preferredLanguage,
+                  relationship,
                 },
               }
             : {}),
@@ -213,28 +222,27 @@ export const SignupPage: React.FC = () => {
 
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                Phone Number *
+                Email Address *
               </label>
               <input
-                type="tel"
+                type="email"
                 required
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="e.g. +91 9876543210"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="e.g. user@domain.com"
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-ner-tea focus:outline-none"
               />
             </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                Email Address {activeTab === 'patient' ? '(Optional)' : '*'}
+                Phone Number (Optional)
               </label>
               <input
-                type="email"
-                required={activeTab !== 'patient'}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="e.g. user@domain.com"
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="e.g. +91 9876543210"
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-ner-tea focus:outline-none"
               />
             </div>
@@ -303,14 +311,14 @@ export const SignupPage: React.FC = () => {
                     onChange={(e) => setCaretakerMode(e.target.value as any)}
                     className="w-full px-3.5 py-2 rounded-xl border border-amber-200 text-sm bg-white font-medium"
                   >
-                    <option value="new_patient">Register a new patient profile now</option>
-                    <option value="link_code">I have a patient invite code (NER-XXXX)</option>
+                    <option value="create_new">Register a new patient profile now</option>
+                    <option value="join_existing">I have a patient invite code (NER-XXXX)</option>
                     <option value="none">Link patient later from dashboard</option>
                   </select>
                 </div>
               </div>
 
-              {caretakerMode === 'link_code' && (
+              {caretakerMode === 'join_existing' && (
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
                     Enter Patient Invite Code
@@ -319,13 +327,13 @@ export const SignupPage: React.FC = () => {
                     type="text"
                     value={inviteCode}
                     onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-                    placeholder="e.g. NER-8K2Q"
+                    placeholder="e.g. SMT-9X4K"
                     className="w-full px-3.5 py-2 rounded-xl border border-amber-300 text-sm bg-white uppercase font-mono tracking-wider font-bold"
                   />
                 </div>
               )}
 
-              {caretakerMode === 'new_patient' && (
+              {caretakerMode === 'create_new' && (
                 <div className="pt-2 border-t border-amber-200 space-y-3">
                   <p className="text-xs font-bold text-amber-900">
                     Patient Profile Details:
@@ -339,7 +347,7 @@ export const SignupPage: React.FC = () => {
                         type="text"
                         value={patientName}
                         onChange={(e) => setPatientName(e.target.value)}
-                        placeholder="e.g. Biren Baruah"
+                        placeholder="e.g. Patient Full Name"
                         className="w-full px-3 py-1.5 rounded-lg border border-amber-200 text-xs bg-white"
                       />
                     </div>

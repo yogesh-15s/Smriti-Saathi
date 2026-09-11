@@ -14,6 +14,11 @@ import {
   signUpWithEmail,
   firebaseSignOut,
 } from '../lib/firebase.js';
+import {
+  syncUserToFirestore,
+  syncPatientProfileToFirestore,
+  syncCaretakerLinkToFirestore,
+} from '../lib/firestoreHelpers.js';
 
 interface AuthUser {
   id: string;
@@ -21,6 +26,7 @@ interface AuthUser {
   email: string | null;
   phone: string;
   role: Role;
+  roles?: string[];
   preferredLanguage: string;
   patientId?: string;
   doctorStatus?: string;
@@ -33,8 +39,8 @@ interface AuthContextType {
   isAuthenticated: boolean;
   loading: boolean;
   login: (credentials: LoginRequest) => Promise<AuthResponse>;
-  loginWithEmail: (email: string, password: string, isSignUp?: boolean) => Promise<AuthResponse>;
-  loginWithGoogle: () => Promise<AuthResponse>;
+  loginWithEmail: (email: string, password: string, isSignUp?: boolean, targetRole?: Role) => Promise<AuthResponse>;
+  loginWithGoogle: (targetRole?: Role) => Promise<AuthResponse>;
   loginWithPhone: (phone: string, passwordOrOtp: string, isOtp?: boolean) => Promise<AuthResponse>;
   registerCaretaker: (payload: RegisterCaretakerRequest) => Promise<AuthResponse>;
   registerDoctor: (payload: RegisterDoctorRequest) => Promise<AuthResponse>;
@@ -83,12 +89,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(data.user);
     localStorage.setItem('ner_auth_token', data.token);
     localStorage.setItem('ner_auth_user', JSON.stringify(data.user));
+    // Sync to Firestore from client (works without admin creds)
+    syncUserToFirestore({
+      id: data.user.id,
+      name: data.user.name,
+      email: data.user.email,
+      phone: data.user.phone,
+      role: data.user.role,
+      preferredLanguage: data.user.preferredLanguage,
+      patientId: data.user.patientId,
+      doctorStatus: data.user.doctorStatus,
+    }).catch(() => {});
+
+    // Sync patient profile to Firestore if role is patient
+    if (data.user.role?.toLowerCase() === 'patient' && data.user.patientId) {
+      syncPatientProfileToFirestore({
+        id: data.user.patientId,
+        userId: data.user.id,
+        name: data.user.name,
+        phone: data.user.phone,
+        preferredLanguage: data.user.preferredLanguage,
+      }).catch(() => {});
+    }
+
     return data;
   };
 
   const login = async (credentials: LoginRequest): Promise<AuthResponse> => {
     if (credentials.identifier && credentials.identifier.includes('@')) {
-      return loginWithEmail(credentials.identifier, credentials.password || '');
+      return loginWithEmail(credentials.identifier, credentials.password || '', false, credentials.role);
     }
     const response = await apiRequest<AuthResponse>('/api/auth/login', {
       method: 'POST',
@@ -100,7 +129,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const syncFirebaseUserWithBackend = async (
     fbUser: any,
     idToken: string,
-    email: string
+    email: string,
+    targetRole?: Role
   ): Promise<AuthResponse> => {
     try {
       const response = await apiRequest<AuthResponse>('/api/auth/social-login', {
@@ -110,11 +140,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           name: fbUser.displayName || (fbUser.email || email).split('@')[0],
           provider: 'firebase',
           phone: fbUser.phoneNumber || '',
+          role: targetRole || 'caretaker',
         }),
       });
       return handleAuthSuccess(response);
     } catch (apiErr) {
       console.warn('Backend sync failed, using local Firebase session:', apiErr);
+      const chosenRole = (targetRole || 'caretaker') as Role;
+      const patientId = chosenRole === 'patient' ? `pat-${fbUser.uid.slice(0, 8)}` : undefined;
       const fallback: AuthResponse = {
         token: idToken || 'fb-session-' + Date.now(),
         user: {
@@ -122,10 +155,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           name: fbUser.displayName || (fbUser.email || email).split('@')[0] || 'User',
           email: fbUser.email || email,
           phone: fbUser.phoneNumber || '',
-          role: 'caretaker' as Role,
+          role: chosenRole,
           preferredLanguage: 'en',
+          patientId,
         },
       };
+
+      if (chosenRole === 'patient' && patientId) {
+        syncPatientProfileToFirestore({
+          id: patientId,
+          userId: fbUser.uid,
+          name: fbUser.displayName || (fbUser.email || email).split('@')[0] || 'User',
+          phone: fbUser.phoneNumber || '',
+          preferredLanguage: 'en',
+        }).catch(() => {});
+      }
+
       return handleAuthSuccess(fallback);
     }
   };
@@ -133,7 +178,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginWithEmail = async (
     emailAddress: string,
     pass: string,
-    isSignUp: boolean = false
+    isSignUp: boolean = false,
+    targetRole?: Role
   ): Promise<AuthResponse> => {
     const cleanEmail = emailAddress.trim().toLowerCase();
 
@@ -141,7 +187,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (isSignUp) {
       try {
         const { user: fbUser, idToken } = await signUpWithEmail(cleanEmail, pass);
-        return await syncFirebaseUserWithBackend(fbUser, idToken, cleanEmail);
+        return await syncFirebaseUserWithBackend(fbUser, idToken, cleanEmail, targetRole);
       } catch (fbErr: any) {
         if (fbErr.code === 'auth/operation-not-allowed') {
           throw new Error(
@@ -159,7 +205,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const response = await apiRequest<AuthResponse>('/api/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ identifier: cleanEmail, password: pass }),
+        body: JSON.stringify({ identifier: cleanEmail, password: pass, role: targetRole }),
       });
       return handleAuthSuccess(response);
     } catch (backendErr: any) {
@@ -169,7 +215,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // 3. Try Firebase signInWithEmail as fallback
     try {
       const { user: fbUser, idToken } = await signInWithEmail(cleanEmail, pass);
-      return await syncFirebaseUserWithBackend(fbUser, idToken, cleanEmail);
+      return await syncFirebaseUserWithBackend(fbUser, idToken, cleanEmail, targetRole);
     } catch (fbErr: any) {
       console.warn('Firebase signInWithEmail failed:', fbErr.code, fbErr.message);
 
@@ -178,7 +224,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (pass && pass.length >= 6) {
           try {
             const { user: newFbUser, idToken } = await signUpWithEmail(cleanEmail, pass);
-            return await syncFirebaseUserWithBackend(newFbUser, idToken, cleanEmail);
+            return await syncFirebaseUserWithBackend(newFbUser, idToken, cleanEmail, targetRole);
           } catch (autoErr: any) {
             console.warn('Auto-create in Firebase failed:', autoErr.code);
           }
@@ -194,10 +240,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const loginWithGoogle = async (): Promise<AuthResponse> => {
+  const loginWithGoogle = async (targetRole?: Role): Promise<AuthResponse> => {
     try {
       const { user: fbUser, idToken } = await signInWithGoogle();
-      return await syncFirebaseUserWithBackend(fbUser, idToken, fbUser.email || '');
+      return await syncFirebaseUserWithBackend(fbUser, idToken, fbUser.email || '', targetRole);
     } catch (fbErr: any) {
       console.error('Firebase Google authentication failed:', fbErr);
       throw fbErr;
@@ -228,7 +274,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       method: 'POST',
       body: JSON.stringify(payload),
     });
-    return handleAuthSuccess(response);
+    const result = handleAuthSuccess(response);
+
+    // Write patient profile + link to Firestore if a new patient was created
+    if (payload.patientDetails && response.user.patientId) {
+      const patientId = response.user.patientId;
+      syncPatientProfileToFirestore({
+        id: patientId,
+        name: payload.patientDetails.name || '',
+        phone: payload.patientDetails.phone || '',
+        dementiaStage: payload.patientDetails.dementiaStage,
+        emergencyContact: payload.patientDetails.emergencyContact,
+        preferredLanguage: payload.patientDetails.preferredLanguage,
+        caretakerId: response.user.id,
+        caretakerName: response.user.name,
+        dateOfBirth: payload.patientDetails.dateOfBirth,
+      }).catch(() => {});
+
+      syncCaretakerLinkToFirestore({
+        id: `link-${response.user.id}-${patientId}`,
+        caretakerId: response.user.id,
+        patientId,
+        relationship: payload.patientDetails.relationship || 'Caregiver',
+        status: 'active',
+      }).catch(() => {});
+    }
+
+    return result;
   };
 
   const registerDoctor = async (payload: RegisterDoctorRequest): Promise<AuthResponse> => {

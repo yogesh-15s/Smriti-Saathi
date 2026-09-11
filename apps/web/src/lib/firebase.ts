@@ -12,6 +12,8 @@ import {
   User as FirebaseUser,
 } from 'firebase/auth';
 
+import { getFirestore } from 'firebase/firestore';
+
 // Read config from Vite environment variables with fallback to project defaults
 export const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyAfRmELsrj734q7k5pF3vZ0NSRoMyyGfUY',
@@ -26,6 +28,7 @@ export const firebaseConfig = {
 // Safe singleton initialization
 export const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+export const db = getFirestore(app);
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 
