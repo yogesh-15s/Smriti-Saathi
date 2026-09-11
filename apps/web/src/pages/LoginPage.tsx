@@ -17,7 +17,7 @@ import {
 import { useAuth } from '../context/AuthContext.js';
 
 export const LoginPage: React.FC = () => {
-  const { login, loginWithGoogle, loginWithPhone, getRoleHomeUrl } = useAuth();
+  const { login, loginWithEmail, loginWithGoogle, loginWithPhone, getRoleHomeUrl } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const redirectPath = searchParams.get('redirect');
@@ -90,10 +90,7 @@ export const LoginPage: React.FC = () => {
     setInfoMessage(null);
 
     try {
-      const response = await login({
-        identifier: email.trim(),
-        password: emailPassword || undefined,
-      });
+      const response = await loginWithEmail(email.trim(), emailPassword);
       handleSuccessfulAuth(response.user.role);
     } catch (err: any) {
       setErrorMessage(
@@ -245,11 +242,11 @@ export const LoginPage: React.FC = () => {
 
         {/* Divider */}
         <div className="relative flex items-center justify-center mb-5">
-          <div className="border-t border-slate-200 w-full" />
-          <span className="bg-white px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+          <div className="flex-1 border-t border-slate-200" />
+          <span className="px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
             or sign in with
           </span>
-          <div className="border-t border-slate-200 w-full" />
+          <div className="flex-1 border-t border-slate-200" />
         </div>
 
         {/* Auth Method Switcher (Email vs Phone) */}

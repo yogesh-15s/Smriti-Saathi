@@ -87,6 +87,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const login = async (credentials: LoginRequest): Promise<AuthResponse> => {
+    if (credentials.identifier && credentials.identifier.includes('@')) {
+      return loginWithEmail(credentials.identifier, credentials.password || '');
+    }
     const response = await apiRequest<AuthResponse>('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify(credentials),
@@ -152,80 +155,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
-    // 2. Check built-in demo accounts (caretaker@nerdementia.in, dr.baruah@guwahatimed.in, etc.)
-    const isDemo =
-      cleanEmail.includes('nerdementia') ||
-      cleanEmail.includes('guwahatimed') ||
-      cleanEmail.includes('ner-health');
-
-    if (isDemo) {
-      try {
-        const response = await apiRequest<AuthResponse>('/api/auth/login', {
-          method: 'POST',
-          body: JSON.stringify({ identifier: cleanEmail, password: pass }),
-        });
-        return handleAuthSuccess(response);
-      } catch (demoErr) {
-        console.warn('Demo login failed, falling through to Firebase:', demoErr);
-      }
+    // 2. Try backend API login first
+    try {
+      const response = await apiRequest<AuthResponse>('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ identifier: cleanEmail, password: pass }),
+      });
+      return handleAuthSuccess(response);
+    } catch (backendErr: any) {
+      console.warn('Backend email login failed/offline, attempting Firebase fallback:', backendErr);
     }
 
-    // 3. Try Firebase signInWithEmail
+    // 3. Try Firebase signInWithEmail as fallback
     try {
       const { user: fbUser, idToken } = await signInWithEmail(cleanEmail, pass);
       return await syncFirebaseUserWithBackend(fbUser, idToken, cleanEmail);
     } catch (fbErr: any) {
       console.warn('Firebase signInWithEmail failed:', fbErr.code, fbErr.message);
 
-      // If user does not exist in Firebase, check backend DB or try auto-signup
       if (fbErr.code === 'auth/user-not-found' || fbErr.code === 'auth/invalid-credential') {
-        try {
-          const backendRes = await apiRequest<AuthResponse>('/api/auth/login', {
-            method: 'POST',
-            body: JSON.stringify({ identifier: cleanEmail, password: pass }),
-          });
-          return handleAuthSuccess(backendRes);
-        } catch {
-          // If password is at least 6 chars, try auto-creating in Firebase for seamless UX
-          if (pass.length >= 6) {
-            try {
-              const { user: newFbUser, idToken } = await signUpWithEmail(cleanEmail, pass);
-              return await syncFirebaseUserWithBackend(newFbUser, idToken, cleanEmail);
-            } catch (autoErr: any) {
-              console.warn('Auto-create in Firebase failed:', autoErr.code);
-            }
+        // If password is at least 6 chars, try auto-creating in Firebase for seamless UX
+        if (pass && pass.length >= 6) {
+          try {
+            const { user: newFbUser, idToken } = await signUpWithEmail(cleanEmail, pass);
+            return await syncFirebaseUserWithBackend(newFbUser, idToken, cleanEmail);
+          } catch (autoErr: any) {
+            console.warn('Auto-create in Firebase failed:', autoErr.code);
           }
-          throw new Error(
-            'No account found with this email, or password is incorrect. Please verify your credentials or click "Create Account".'
-          );
         }
-      } else if (fbErr.code === 'auth/operation-not-allowed') {
-        // Firebase Email provider is not enabled in Firebase Console!
-        // Try backend login first
-        try {
-          const backendRes = await apiRequest<AuthResponse>('/api/auth/login', {
-            method: 'POST',
-            body: JSON.stringify({ identifier: cleanEmail, password: pass }),
-          });
-          return handleAuthSuccess(backendRes);
-        } catch {
-          throw new Error(
-            'Email/Password sign-in is disabled in your Firebase Console. Go to Firebase Console > Authentication > Sign-in method and enable "Email/Password".'
-          );
-        }
+        throw new Error(
+          'No account found with this email, or password is incorrect. Please verify your credentials or register a new account.'
+        );
       } else if (fbErr.code === 'auth/wrong-password') {
         throw new Error('Incorrect password for this email account.');
       } else {
-        // Check backend before failing
-        try {
-          const backendRes = await apiRequest<AuthResponse>('/api/auth/login', {
-            method: 'POST',
-            body: JSON.stringify({ identifier: cleanEmail, password: pass }),
-          });
-          return handleAuthSuccess(backendRes);
-        } catch {
-          throw new Error(fbErr.message || 'Failed to sign in with email.');
-        }
+        throw new Error(fbErr.message || 'Failed to sign in with email.');
       }
     }
   };
