@@ -31,3 +31,14 @@ lerna-debug.log*
 *.sw?
 .DS_Store
 Thumbs.db
+<<<<<<< HEAD
+=======
+
+
+# .gitignore (in root)
+apps/api/serviceAccountKey.json
+
+
+serviceAccountKey.json
+*.json
+>>>>>>> 5f67acc (database)
