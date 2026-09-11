@@ -15,6 +15,7 @@ import {
   markCaretakerMessageViewed,
   logSafeZoneBreach,
   getPatientWeather,
+  getGameContent,
 } from '../services/data.service.js';
 import { GameSessionSubmission, SOSRequestPayload } from '@ner/types';
 
@@ -76,41 +77,123 @@ router.patch('/reminders/:id/done', async (req: Request, res: Response) => {
 
 /**
  * GET /api/patient/games
- * Cognitive training games catalog with difficulty levels
+ * GET /api/patient/games
+ * Cognitive training games catalog categorized into 3 large domains
  */
 router.get('/games', async (req: Request, res: Response) => {
   try {
     const games = [
+      // 1. Memory Games
       {
         id: 'memory_match',
         name: 'Assam Tea Flora Match',
         description: 'Find matching pairs of tea leaves, wild orchids, and rhododendrons.',
-        category: 'Visual & Working Memory',
-        icon: 'flower',
+        category: 'memory',
+        categoryLabel: 'Memory Games',
+        icon: '🍃',
+        initialDifficulty: 1,
+      },
+      {
+        id: 'spatial_recall',
+        name: 'Where Did I Put It?',
+        description: 'Remember where everyday items were placed in cozy room scenes.',
+        category: 'memory',
+        categoryLabel: 'Memory Games',
+        icon: '👓',
         initialDifficulty: 1,
       },
       {
         id: 'sequence_recall',
         name: 'Hornbill Rhythm & Sequence',
-        description: 'Watch the glowing lanterns and repeat the pattern sequence.',
-        category: 'Working Memory & Attention',
-        icon: 'music',
+        description: 'Watch the glowing lanterns and repeat the calming pattern sequence.',
+        category: 'memory',
+        categoryLabel: 'Memory Games',
+        icon: '🔔',
+        initialDifficulty: 1,
+      },
+      {
+        id: 'face_recognition',
+        name: 'Family Faces Memory',
+        description: 'Recognize your cherished family members and warm memories.',
+        category: 'memory',
+        categoryLabel: 'Memory Games',
+        icon: '👨‍👩‍👧‍👦',
+        initialDifficulty: 1,
+      },
+
+      // 2. Matching & Sorting
+      {
+        id: 'odd_one_out',
+        name: 'Odd One Out',
+        description: 'Find which friendly item does not belong to the group.',
+        category: 'matching_sorting',
+        categoryLabel: 'Matching & Sorting',
+        icon: '🔍',
+        initialDifficulty: 1,
+      },
+      {
+        id: 'picture_naming',
+        name: 'Kaziranga Picture Naming',
+        description: 'Speak or tap the friendly name for regional animals and objects.',
+        category: 'matching_sorting',
+        categoryLabel: 'Matching & Sorting',
+        icon: '🦏',
+        initialDifficulty: 1,
+      },
+      {
+        id: 'word_pairing',
+        name: 'Rhymes & Word Pairs',
+        description: 'Match words that rhyme or belong together like tea and cup.',
+        category: 'matching_sorting',
+        categoryLabel: 'Matching & Sorting',
+        icon: '☕',
+        initialDifficulty: 1,
+      },
+      {
+        id: 'routine_sequencing',
+        name: 'Daily Routine Steps',
+        description: 'Put morning tea or garden routines into the peaceful right order.',
+        category: 'matching_sorting',
+        categoryLabel: 'Matching & Sorting',
+        icon: '🫖',
+        initialDifficulty: 1,
+      },
+      {
+        id: 'category_sorting',
+        name: 'Gentle Sorting',
+        description: 'Sort healthy foods and nature into two large friendly zones.',
+        category: 'matching_sorting',
+        categoryLabel: 'Matching & Sorting',
+        icon: '🧺',
         initialDifficulty: 1,
       },
       {
         id: 'word_association',
         name: 'Brahmaputra Word Pairs',
         description: 'Connect related everyday items and familiar regional words.',
-        category: 'Language & Association',
-        icon: 'book-open',
+        category: 'matching_sorting',
+        categoryLabel: 'Matching & Sorting',
+        icon: '📖',
+        initialDifficulty: 1,
+      },
+
+      // 3. Culture & Movement
+      {
+        id: 'festival_matching',
+        name: 'Festivals of North East',
+        description: 'Cherish joyful memories of Bihu, Hornbill, and mountain festivals.',
+        category: 'culture_movement',
+        categoryLabel: 'Culture & Movement',
+        icon: '🪘',
         initialDifficulty: 1,
       },
       {
-        id: 'picture_naming',
-        name: 'Kaziranga Picture Naming',
-        description: 'Look at the picture and choose the correct friendly animal name.',
-        category: 'Object Recognition & Semantic Memory',
-        icon: 'image',
+        id: 'gesture_mirror',
+        name: 'Gentle Hand Gestures',
+        description: 'Gentle physical warm-up mimicking peaceful hand movements like Namaste.',
+        category: 'culture_movement',
+        categoryLabel: 'Culture & Movement',
+        icon: '🙏',
         initialDifficulty: 1,
       },
     ];
@@ -118,6 +201,26 @@ router.get('/games', async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error('Error fetching games:', err);
     sendError(res, 'GAMES_ERROR', err.message || 'Failed to load games', 500);
+  }
+});
+
+/**
+ * GET /api/patient/games/content
+ * Fetch game content bank items with optional filters: gameType, regionTag, difficultyLevel
+ */
+router.get('/games/content', async (req: Request, res: Response) => {
+  try {
+    const gameType = req.query.gameType as string | undefined;
+    const regionTag = req.query.regionTag as string | undefined;
+    const difficultyLevel = req.query.difficultyLevel
+      ? parseInt(req.query.difficultyLevel as string, 10)
+      : undefined;
+
+    const contentItems = await getGameContent(gameType, regionTag, difficultyLevel);
+    sendSuccess(res, contentItems);
+  } catch (err: any) {
+    console.error('Error fetching game content:', err);
+    sendError(res, 'GAME_CONTENT_ERROR', err.message || 'Failed to load game content', 500);
   }
 });
 

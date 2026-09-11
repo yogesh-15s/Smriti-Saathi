@@ -125,6 +125,16 @@ export interface GameSession {
   playedAt: string;
 }
 
+// Game Content (Per-game content item bank for regional localization)
+export interface GameContentItem {
+  id: string;
+  gameType: string;
+  contentData: Record<string, any>;
+  regionTag?: string | null;
+  difficultyLevel: number;
+  createdAt?: string;
+}
+
 // Cognitive Score (for trend charts)
 export interface CognitiveScore {
   id: string;

@@ -187,6 +187,18 @@ model GameSession {
   @@map("game_sessions")
 }
 
+// 6b. Game Content (Localized Content Banks)
+model GameContent {
+  id              String   @id @default(uuid()) @db.Uuid
+  gameType        String   @map("game_type")
+  contentData     Json     @map("content_data")
+  regionTag       String?  @map("region_tag")
+  difficultyLevel Int      @default(1) @map("difficulty_level")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@map("game_content")
+}
+
 // 7. Cognitive Scores (for trend charts)
 model CognitiveScore {
   id             String   @id @default(uuid()) @db.Uuid

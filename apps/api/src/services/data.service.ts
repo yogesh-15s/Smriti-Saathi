@@ -24,6 +24,7 @@ import {
   PatientContact,
   CaretakerMessage,
   PatientWeatherInfo,
+  GameContentItem,
 } from '@ner/types';
 import { notifyCaretaker, notifyDoctor } from './notification.service.js';
 import {
@@ -522,6 +523,424 @@ const store = {
     'pat-2:memory_match': { currentLevel: 1, streakCorrect: 0, streakWrong: 2 },
     'pat-2:sequence_recall': { currentLevel: 1, streakCorrect: 0, streakWrong: 1 },
   } as Record<string, { currentLevel: number; streakCorrect: number; streakWrong: number }>,
+
+  gameContent: [
+    // 1. Spatial Recall ("Where did I put it")
+    {
+      id: 'gc-spatial-1',
+      gameType: 'spatial_recall',
+      regionTag: 'general_ne',
+      difficultyLevel: 1,
+      contentData: {
+        sceneName: 'Cozy Kitchen Table',
+        sceneDescription: 'A warm wooden table with morning sunshine and tea.',
+        objects: [
+          { id: 'glasses', name: 'Reading Spectacles', icon: '👓', xPercent: 28, yPercent: 40 },
+          { id: 'cup', name: 'Assam Tea Cup', icon: '🍵', xPercent: 72, yPercent: 35 },
+        ],
+        targetObjectId: 'glasses',
+        prompt: 'Where did I put my reading spectacles?',
+        pauseSeconds: 5,
+        toleranceRadiusPercent: 18,
+      },
+    },
+    {
+      id: 'gc-spatial-2',
+      gameType: 'spatial_recall',
+      regionTag: 'general_ne',
+      difficultyLevel: 2,
+      contentData: {
+        sceneName: 'Living Room Bookshelf',
+        sceneDescription: 'A shelf with favorite books and everyday essentials.',
+        objects: [
+          { id: 'keys', name: 'House Brass Keys', icon: '🔑', xPercent: 20, yPercent: 30 },
+          { id: 'cup', name: 'Tea Cup', icon: '☕', xPercent: 50, yPercent: 65 },
+          { id: 'comb', name: 'Wooden Comb', icon: '🪮', xPercent: 80, yPercent: 35 },
+        ],
+        targetObjectId: 'keys',
+        prompt: 'Where did I put the house brass keys?',
+        pauseSeconds: 4,
+        toleranceRadiusPercent: 14,
+      },
+    },
+    {
+      id: 'gc-spatial-3',
+      gameType: 'spatial_recall',
+      regionTag: 'general_ne',
+      difficultyLevel: 3,
+      contentData: {
+        sceneName: 'Veranda Tea Table',
+        sceneDescription: 'Overlooking the peaceful garden with flowers and bamboo.',
+        objects: [
+          { id: 'watch', name: 'Pocket Watch', icon: '⏱️', xPercent: 25, yPercent: 30 },
+          { id: 'medicine', name: 'Morning Tonic', icon: '🧴', xPercent: 75, yPercent: 28 },
+          { id: 'pen', name: 'Fountain Pen', icon: '✒️', xPercent: 35, yPercent: 70 },
+          { id: 'spectacles', name: 'Spectacles', icon: '👓', xPercent: 68, yPercent: 65 },
+        ],
+        targetObjectId: 'medicine',
+        prompt: 'Where did I place the morning tonic bottle?',
+        pauseSeconds: 3,
+        toleranceRadiusPercent: 11,
+      },
+    },
+
+    // 2. Odd One Out
+    {
+      id: 'gc-odd-1',
+      gameType: 'odd_one_out',
+      regionTag: 'general_ne',
+      difficultyLevel: 1,
+      contentData: {
+        categoryLabel: 'Sweet Fresh Fruits',
+        explanation: 'The Bicycle is for riding, while the others are delicious sweet fruits! 🍎🚲',
+        items: [
+          { id: 'apple', label: 'Crisp Apple', icon: '🍎', isOdd: false },
+          { id: 'banana', label: 'Sweet Banana', icon: '🍌', isOdd: false },
+          { id: 'bicycle', label: 'Bicycle', icon: '🚲', isOdd: true },
+          { id: 'orange', label: 'Juicy Orange', icon: '🍊', isOdd: false },
+        ],
+      },
+    },
+    {
+      id: 'gc-odd-2',
+      gameType: 'odd_one_out',
+      regionTag: 'assam',
+      difficultyLevel: 2,
+      contentData: {
+        categoryLabel: 'Birds of the North East',
+        explanation: 'The Golden Fish swims in fresh rivers, while the others are birds of the sky! 🦅🐟',
+        items: [
+          { id: 'hornbill', label: 'Great Hornbill', icon: '🦤', isOdd: false },
+          { id: 'myna', label: 'Assam Hill Myna', icon: '🐦', isOdd: false },
+          { id: 'fish', label: 'River Golden Fish', icon: '🐟', isOdd: true },
+          { id: 'dove', label: 'Gentle Dove', icon: '🕊️', isOdd: false },
+          { id: 'duck', label: 'White-winged Duck', icon: '🦆', isOdd: false },
+        ],
+      },
+    },
+    {
+      id: 'gc-odd-3',
+      gameType: 'odd_one_out',
+      regionTag: 'assam',
+      difficultyLevel: 3,
+      contentData: {
+        categoryLabel: 'Tea Garden & Warm Drinks',
+        explanation: 'A Hammer is a building tool, while all the others belong to brewing warm Assam tea! ☕🔨',
+        items: [
+          { id: 'teacup', label: 'Fresh Assam Tea', icon: '🍵', isOdd: false },
+          { id: 'kettle', label: 'Boiling Kettle', icon: '🫖', isOdd: false },
+          { id: 'leaves', label: 'Green Tea Leaves', icon: '🍃', isOdd: false },
+          { id: 'hammer', label: 'Iron Hammer', icon: '🔨', isOdd: true },
+          { id: 'teapot', label: 'Ceramic Teapot', icon: '☕', isOdd: false },
+        ],
+      },
+    },
+
+    // 3. Picture Naming
+    {
+      id: 'gc-pic-1',
+      gameType: 'picture_naming',
+      regionTag: 'assam',
+      difficultyLevel: 1,
+      contentData: {
+        targetName: 'Rhinoceros',
+        prompt: 'Look at this majestic animal from Kaziranga National Park.',
+        icon: '🦏',
+        synonyms: ['rhino', 'rhinoceros', 'one horned rhino', 'gorh'],
+        options: ['Rhinoceros', 'Elephant', 'Wild Buffalo'],
+      },
+    },
+    {
+      id: 'gc-pic-2',
+      gameType: 'picture_naming',
+      regionTag: 'general_ne',
+      difficultyLevel: 1,
+      contentData: {
+        targetName: 'Tea Kettle',
+        prompt: 'What is this friendly utensil used to boil water for morning tea?',
+        icon: '🫖',
+        synonyms: ['kettle', 'tea kettle', 'teapot'],
+        options: ['Tea Kettle', 'Water Glass', 'Rice Cooker'],
+      },
+    },
+    {
+      id: 'gc-pic-3',
+      gameType: 'picture_naming',
+      regionTag: 'assam',
+      difficultyLevel: 2,
+      contentData: {
+        targetName: 'Dhol',
+        prompt: 'Which traditional rhythmic wooden drum is played during festive Bihu songs?',
+        icon: '🥁',
+        synonyms: ['dhol', 'drum', 'bihu dhol'],
+        options: ['Dhol', 'Flute', 'Violin'],
+      },
+    },
+    {
+      id: 'gc-pic-4',
+      gameType: 'picture_naming',
+      regionTag: 'nagaland',
+      difficultyLevel: 2,
+      contentData: {
+        targetName: 'Hornbill',
+        prompt: 'Which magnificent bird with a golden yellow beak is revered across Nagaland?',
+        icon: '🦤',
+        synonyms: ['hornbill', 'great hornbill', 'bird'],
+        options: ['Hornbill', 'Kingfisher', 'Woodpecker'],
+      },
+    },
+
+    // 4. Word Pairing (Rhyme or Association)
+    {
+      id: 'gc-pair-1',
+      gameType: 'word_pairing',
+      regionTag: 'general_ne',
+      difficultyLevel: 1,
+      contentData: {
+        pairType: 'association',
+        targetWord: 'Tea',
+        targetIcon: '🍃',
+        prompt: 'Which item naturally goes with hot steaming tea?',
+        correctPair: 'Cup',
+        correctIcon: '☕',
+        options: ['Cup', 'Shoe', 'Blanket', 'Car'],
+      },
+    },
+    {
+      id: 'gc-pair-2',
+      gameType: 'word_pairing',
+      regionTag: 'general_ne',
+      difficultyLevel: 1,
+      contentData: {
+        pairType: 'rhyme',
+        targetWord: 'Cat',
+        targetIcon: '🐱',
+        prompt: 'Listen carefully: Which word rhymes with "Cat"?',
+        correctPair: 'Hat',
+        correctIcon: '👒',
+        options: ['Hat', 'Dog', 'Tree', 'Fish'],
+      },
+    },
+    {
+      id: 'gc-pair-3',
+      gameType: 'word_pairing',
+      regionTag: 'general_ne',
+      difficultyLevel: 2,
+      contentData: {
+        pairType: 'association',
+        targetWord: 'Monsoon Rain',
+        targetIcon: '🌧️',
+        prompt: 'When monsoon rain showers from the sky, what do you carry?',
+        correctPair: 'Umbrella',
+        correctIcon: '☂️',
+        options: ['Umbrella', 'Sunglasses', 'Torch', 'Watch'],
+      },
+    },
+    {
+      id: 'gc-pair-4',
+      gameType: 'word_pairing',
+      regionTag: 'general_ne',
+      difficultyLevel: 2,
+      contentData: {
+        pairType: 'rhyme',
+        targetWord: 'Ring',
+        targetIcon: '💍',
+        prompt: 'Which joyful word sounds like and rhymes with "Ring"?',
+        correctPair: 'Sing',
+        correctIcon: '🎵',
+        options: ['Sing', 'Walk', 'Sleep', 'Eat'],
+      },
+    },
+
+    // 5. Routine Sequencing
+    {
+      id: 'gc-seq-1',
+      gameType: 'routine_sequencing',
+      regionTag: 'assam',
+      difficultyLevel: 1,
+      contentData: {
+        routineTitle: 'Making a Cup of Assam Tea',
+        prompt: 'Put these morning tea steps into the right peaceful order.',
+        steps: [
+          { id: 's1', label: 'Boil fresh water in the kettle', icon: '🫖', correctPosition: 1 },
+          { id: 's2', label: 'Add rich tea leaves to steep', icon: '🍃', correctPosition: 2 },
+          { id: 's3', label: 'Pour golden tea into warm cup', icon: '☕', correctPosition: 3 },
+        ],
+      },
+    },
+    {
+      id: 'gc-seq-2',
+      gameType: 'routine_sequencing',
+      regionTag: 'general_ne',
+      difficultyLevel: 2,
+      contentData: {
+        routineTitle: 'Planting a Garden Flower',
+        prompt: 'Order the steps to nurture a beautiful garden blossom.',
+        steps: [
+          { id: 'p1', label: 'Dig a small gentle hole in soil', icon: '🌱', correctPosition: 1 },
+          { id: 'p2', label: 'Carefully place the flower seedling', icon: '🌿', correctPosition: 2 },
+          { id: 'p3', label: 'Gently cover roots with soft earth', icon: '🪴', correctPosition: 3 },
+          { id: 'p4', label: 'Shower with clean cool water', icon: '🚿', correctPosition: 4 },
+        ],
+      },
+    },
+
+    // 6. Category Sorting
+    {
+      id: 'gc-sort-1',
+      gameType: 'category_sorting',
+      regionTag: 'general_ne',
+      difficultyLevel: 1,
+      contentData: {
+        categoryA: { id: 'fruits', label: 'Fresh Fruits', icon: '🍎', color: 'emerald' },
+        categoryB: { id: 'vegetables', label: 'Garden Vegetables', icon: '🥕', color: 'amber' },
+        prompt: 'Sort each healthy food into Fruits or Vegetables.',
+        items: [
+          { id: 'i1', name: 'Sweet Mango', icon: '🥭', category: 'fruits' },
+          { id: 'i2', name: 'Green Spinach', icon: '🥬', category: 'vegetables' },
+          { id: 'i3', name: 'Ripe Banana', icon: '🍌', category: 'fruits' },
+          { id: 'i4', name: 'Crunchy Carrot', icon: '🥕', category: 'vegetables' },
+          { id: 'i5', name: 'Juicy Orange', icon: '🍊', category: 'fruits' },
+          { id: 'i6', name: 'Fresh Potato', icon: '🥔', category: 'vegetables' },
+        ],
+      },
+    },
+    {
+      id: 'gc-sort-2',
+      gameType: 'category_sorting',
+      regionTag: 'general_ne',
+      difficultyLevel: 2,
+      contentData: {
+        categoryA: { id: 'fly', label: 'Creatures That Fly', icon: '🪶', color: 'sky' },
+        categoryB: { id: 'land', label: 'Animals On Land', icon: '🐾', color: 'emerald' },
+        prompt: 'Sort each friendly animal by where it moves.',
+        items: [
+          { id: 'a1', name: 'Great Hornbill', icon: '🦤', category: 'fly' },
+          { id: 'a2', name: 'Gentle Elephant', icon: '🐘', category: 'land' },
+          { id: 'a3', name: 'Colorful Butterfly', icon: '🦋', category: 'fly' },
+          { id: 'a4', name: 'Spotted Deer', icon: '🦌', category: 'land' },
+          { id: 'a5', name: 'Singing Myna', icon: '🐦', category: 'fly' },
+          { id: 'a6', name: 'Sturdy Rhinoceros', icon: '🦏', category: 'land' },
+        ],
+      },
+    },
+
+    // 7. Festival Matching
+    {
+      id: 'gc-fest-1',
+      gameType: 'festival_matching',
+      regionTag: 'assam',
+      difficultyLevel: 1,
+      contentData: {
+        festivalName: 'Rongali Bihu',
+        prompt: 'Do you remember which state celebrates Rongali Bihu with joyous Dhol rhythms and sweet Pitha?',
+        imageDescription: 'Dancing with colourful traditional Muga silk garments',
+        icon: '🪘',
+        correctAnswer: 'Assam',
+        options: ['Assam', 'Goa', 'Kerala'],
+        celebratoryFact: 'Bihu marks the arrival of spring and harvest in Assam, filling homes with warmth and music! 🌸',
+      },
+    },
+    {
+      id: 'gc-fest-2',
+      gameType: 'festival_matching',
+      regionTag: 'nagaland',
+      difficultyLevel: 1,
+      contentData: {
+        festivalName: 'Hornbill Festival',
+        prompt: 'Do you remember the famous "Festival of Festivals" held at Kisama Heritage Village in Nagaland?',
+        imageDescription: 'Warrior dances and traditional log drum performances',
+        icon: '🪶',
+        correctAnswer: 'Nagaland',
+        options: ['Nagaland', 'Punjab', 'Gujarat'],
+        celebratoryFact: 'Hornbill Festival brings together all 16 tribes of Nagaland in glorious song, dance, and craft! 🏔️',
+      },
+    },
+    {
+      id: 'gc-fest-3',
+      gameType: 'festival_matching',
+      regionTag: 'sikkim',
+      difficultyLevel: 2,
+      contentData: {
+        festivalName: 'Losar Festival',
+        prompt: 'Do you remember which Himalayan state lights butter lamps and raises prayer flags for Losar?',
+        imageDescription: 'Monastery prayers with peaceful chimes and mountain snow',
+        icon: '🕯️',
+        correctAnswer: 'Sikkim',
+        options: ['Sikkim', 'Rajasthan', 'Tamil Nadu'],
+        celebratoryFact: 'Losar welcomes the Tibetan New Year in Sikkim with prayers for health, peace, and longevity! 🪔',
+      },
+    },
+    {
+      id: 'gc-fest-4',
+      gameType: 'festival_matching',
+      regionTag: 'meghalaya',
+      difficultyLevel: 2,
+      contentData: {
+        festivalName: 'Wangala Hundred Drums',
+        prompt: 'Do you remember which cloud-kissed state celebrates the Wangala 100-Drums harvest festival?',
+        imageDescription: 'Rhythmic beats echoing through pine hills',
+        icon: '🥁',
+        correctAnswer: 'Meghalaya',
+        options: ['Meghalaya', 'Haryana', 'Odisha'],
+        celebratoryFact: 'The Garo people of Meghalaya give thanks for harvest with the thunderous beat of 100 long drums! 🌲',
+      },
+    },
+
+    // 8. Gesture Mirroring
+    {
+      id: 'gc-gest-1',
+      gameType: 'gesture_mirror',
+      regionTag: 'general_ne',
+      difficultyLevel: 1,
+      contentData: {
+        gestureName: 'Namaste (Folded Hands)',
+        prompt: 'Gently bring your hands together in front of your chest in a warm, peaceful Namaste greeting.',
+        icon: '🙏',
+        animationType: 'pulse',
+        encouragement: 'Wonderful! You are sharing peace and respect. Take a deep breath and feel at ease. 🌿',
+      },
+    },
+    {
+      id: 'gc-gest-2',
+      gameType: 'gesture_mirror',
+      regionTag: 'general_ne',
+      difficultyLevel: 1,
+      contentData: {
+        gestureName: 'Gentle Friendly Wave',
+        prompt: 'Raise your hand softly and wave side-to-side, like saying hello to a loved grandchild arriving home.',
+        icon: '👋',
+        animationType: 'wave',
+        encouragement: 'A lovely, warm wave! It keeps your wrists flexible and your heart cheerful. 🌟',
+      },
+    },
+    {
+      id: 'gc-gest-3',
+      gameType: 'gesture_mirror',
+      regionTag: 'general_ne',
+      difficultyLevel: 2,
+      contentData: {
+        gestureName: 'Encouraging Thumbs Up',
+        prompt: 'Make a gentle fist and give a clear thumbs-up sign, showing that all is well and peaceful.',
+        icon: '👍',
+        animationType: 'bounce',
+        encouragement: 'Splendid! That simple thumbs-up exercises thumb mobility and radiates confidence! ✨',
+      },
+    },
+    {
+      id: 'gc-gest-4',
+      gameType: 'gesture_mirror',
+      regionTag: 'general_ne',
+      difficultyLevel: 2,
+      contentData: {
+        gestureName: 'Soft Rhythmic Clap',
+        prompt: 'Bring both hands together in 3 gentle, soft claps, just like keeping time with a sweet folk melody.',
+        icon: '👏',
+        animationType: 'clap',
+        encouragement: 'Delightful! Gentle clapping stimulates nerve endings in the palms and brightens your spirit. 🎶',
+      },
+    },
+  ] as GameContentItem[],
 };
 
 function isOverdue(hour: number, minute: number, status: ReminderStatus): boolean {
@@ -615,6 +1034,39 @@ export async function markPatientReminderDone(reminderId: string): Promise<Patie
     isOverdue: false,
     description: reminder.description,
   };
+}
+
+/**
+ * Fetch localized game content bank items for a specific game type, region, and difficulty
+ */
+export async function getGameContent(
+  gameType?: string,
+  regionTag?: string,
+  difficultyLevel?: number
+): Promise<GameContentItem[]> {
+  let items = store.gameContent;
+
+  if (gameType) {
+    items = items.filter((item) => item.gameType === gameType);
+  }
+
+  if (difficultyLevel) {
+    const levelMatch = items.filter((item) => item.difficultyLevel === difficultyLevel);
+    if (levelMatch.length > 0) {
+      items = levelMatch;
+    }
+  }
+
+  if (regionTag) {
+    const regionMatch = items.filter(
+      (item) => item.regionTag === regionTag || item.regionTag === 'general_ne'
+    );
+    if (regionMatch.length > 0) {
+      items = regionMatch;
+    }
+  }
+
+  return items;
 }
 
 export async function submitGameSession(

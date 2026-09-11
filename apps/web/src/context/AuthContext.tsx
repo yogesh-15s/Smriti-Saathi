@@ -8,6 +8,12 @@ import {
   RegisterPatientByCaretakerRequest,
 } from '@ner/types';
 import { apiRequest } from '../lib/api.js';
+import {
+  signInWithGoogle,
+  signInWithEmail,
+  signUpWithEmail,
+  firebaseSignOut,
+} from '../lib/firebase.js';
 
 interface AuthUser {
   id: string;
@@ -27,6 +33,9 @@ interface AuthContextType {
   isAuthenticated: boolean;
   loading: boolean;
   login: (credentials: LoginRequest) => Promise<AuthResponse>;
+  loginWithEmail: (email: string, password: string, isSignUp?: boolean) => Promise<AuthResponse>;
+  loginWithGoogle: () => Promise<AuthResponse>;
+  loginWithPhone: (phone: string, passwordOrOtp: string, isOtp?: boolean) => Promise<AuthResponse>;
   registerCaretaker: (payload: RegisterCaretakerRequest) => Promise<AuthResponse>;
   registerDoctor: (payload: RegisterDoctorRequest) => Promise<AuthResponse>;
   registerPatientByCaretaker: (payload: RegisterPatientByCaretakerRequest) => Promise<AuthResponse>;
@@ -85,6 +94,171 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return handleAuthSuccess(response);
   };
 
+  const syncFirebaseUserWithBackend = async (
+    fbUser: any,
+    idToken: string,
+    email: string
+  ): Promise<AuthResponse> => {
+    try {
+      const response = await apiRequest<AuthResponse>('/api/auth/social-login', {
+        method: 'POST',
+        body: JSON.stringify({
+          email: fbUser.email || email,
+          name: fbUser.displayName || (fbUser.email || email).split('@')[0],
+          provider: 'firebase',
+          phone: fbUser.phoneNumber || '',
+        }),
+      });
+      return handleAuthSuccess(response);
+    } catch (apiErr) {
+      console.warn('Backend sync failed, using local Firebase session:', apiErr);
+      const fallback: AuthResponse = {
+        token: idToken || 'fb-session-' + Date.now(),
+        user: {
+          id: fbUser.uid,
+          name: fbUser.displayName || (fbUser.email || email).split('@')[0] || 'User',
+          email: fbUser.email || email,
+          phone: fbUser.phoneNumber || '',
+          role: 'caretaker' as Role,
+          preferredLanguage: 'en',
+        },
+      };
+      return handleAuthSuccess(fallback);
+    }
+  };
+
+  const loginWithEmail = async (
+    emailAddress: string,
+    pass: string,
+    isSignUp: boolean = false
+  ): Promise<AuthResponse> => {
+    const cleanEmail = emailAddress.trim().toLowerCase();
+
+    // 1. Explicit Sign Up mode
+    if (isSignUp) {
+      try {
+        const { user: fbUser, idToken } = await signUpWithEmail(cleanEmail, pass);
+        return await syncFirebaseUserWithBackend(fbUser, idToken, cleanEmail);
+      } catch (fbErr: any) {
+        if (fbErr.code === 'auth/operation-not-allowed') {
+          throw new Error(
+            'Email/Password sign-in is disabled in your Firebase Console. Please open Firebase Console > Authentication > Sign-in method and enable "Email/Password".'
+          );
+        } else if (fbErr.code === 'auth/email-already-in-use') {
+          // Attempt login if user already exists
+        } else {
+          throw new Error(fbErr.message || 'Failed to create account with email.');
+        }
+      }
+    }
+
+    // 2. Check built-in demo accounts (caretaker@nerdementia.in, dr.baruah@guwahatimed.in, etc.)
+    const isDemo =
+      cleanEmail.includes('nerdementia') ||
+      cleanEmail.includes('guwahatimed') ||
+      cleanEmail.includes('ner-health');
+
+    if (isDemo) {
+      try {
+        const response = await apiRequest<AuthResponse>('/api/auth/login', {
+          method: 'POST',
+          body: JSON.stringify({ identifier: cleanEmail, password: pass }),
+        });
+        return handleAuthSuccess(response);
+      } catch (demoErr) {
+        console.warn('Demo login failed, falling through to Firebase:', demoErr);
+      }
+    }
+
+    // 3. Try Firebase signInWithEmail
+    try {
+      const { user: fbUser, idToken } = await signInWithEmail(cleanEmail, pass);
+      return await syncFirebaseUserWithBackend(fbUser, idToken, cleanEmail);
+    } catch (fbErr: any) {
+      console.warn('Firebase signInWithEmail failed:', fbErr.code, fbErr.message);
+
+      // If user does not exist in Firebase, check backend DB or try auto-signup
+      if (fbErr.code === 'auth/user-not-found' || fbErr.code === 'auth/invalid-credential') {
+        try {
+          const backendRes = await apiRequest<AuthResponse>('/api/auth/login', {
+            method: 'POST',
+            body: JSON.stringify({ identifier: cleanEmail, password: pass }),
+          });
+          return handleAuthSuccess(backendRes);
+        } catch {
+          // If password is at least 6 chars, try auto-creating in Firebase for seamless UX
+          if (pass.length >= 6) {
+            try {
+              const { user: newFbUser, idToken } = await signUpWithEmail(cleanEmail, pass);
+              return await syncFirebaseUserWithBackend(newFbUser, idToken, cleanEmail);
+            } catch (autoErr: any) {
+              console.warn('Auto-create in Firebase failed:', autoErr.code);
+            }
+          }
+          throw new Error(
+            'No account found with this email, or password is incorrect. Please verify your credentials or click "Create Account".'
+          );
+        }
+      } else if (fbErr.code === 'auth/operation-not-allowed') {
+        // Firebase Email provider is not enabled in Firebase Console!
+        // Try backend login first
+        try {
+          const backendRes = await apiRequest<AuthResponse>('/api/auth/login', {
+            method: 'POST',
+            body: JSON.stringify({ identifier: cleanEmail, password: pass }),
+          });
+          return handleAuthSuccess(backendRes);
+        } catch {
+          throw new Error(
+            'Email/Password sign-in is disabled in your Firebase Console. Go to Firebase Console > Authentication > Sign-in method and enable "Email/Password".'
+          );
+        }
+      } else if (fbErr.code === 'auth/wrong-password') {
+        throw new Error('Incorrect password for this email account.');
+      } else {
+        // Check backend before failing
+        try {
+          const backendRes = await apiRequest<AuthResponse>('/api/auth/login', {
+            method: 'POST',
+            body: JSON.stringify({ identifier: cleanEmail, password: pass }),
+          });
+          return handleAuthSuccess(backendRes);
+        } catch {
+          throw new Error(fbErr.message || 'Failed to sign in with email.');
+        }
+      }
+    }
+  };
+
+  const loginWithGoogle = async (): Promise<AuthResponse> => {
+    try {
+      const { user: fbUser, idToken } = await signInWithGoogle();
+      return await syncFirebaseUserWithBackend(fbUser, idToken, fbUser.email || '');
+    } catch (fbErr: any) {
+      console.error('Firebase Google authentication failed:', fbErr);
+      throw fbErr;
+    }
+  };
+
+  const loginWithPhone = async (
+    phone: string,
+    passwordOrOtp: string,
+    isOtp: boolean = false
+  ): Promise<AuthResponse> => {
+    const payload: any = { phone };
+    if (isOtp) {
+      payload.otp = passwordOrOtp;
+    } else {
+      payload.password = passwordOrOtp;
+    }
+
+    const response = await apiRequest<AuthResponse>('/api/auth/phone-login', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return handleAuthSuccess(response);
+  };
+
   const registerCaretaker = async (payload: RegisterCaretakerRequest): Promise<AuthResponse> => {
     const response = await apiRequest<AuthResponse>('/api/auth/register/caretaker', {
       method: 'POST',
@@ -112,6 +286,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
+    firebaseSignOut().catch(() => {});
     setToken(null);
     setUser(null);
     localStorage.removeItem('ner_auth_token');
@@ -141,6 +316,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAuthenticated: !!token && !!user,
         loading,
         login,
+        loginWithEmail,
+        loginWithGoogle,
+        loginWithPhone,
         registerCaretaker,
         registerDoctor,
         registerPatientByCaretaker,

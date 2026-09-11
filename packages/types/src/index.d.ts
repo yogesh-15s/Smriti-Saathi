@@ -81,6 +81,14 @@ export interface GameSession {
     durationSeconds: number;
     playedAt: string;
 }
+export interface GameContentItem {
+    id: string;
+    gameType: string;
+    contentData: Record<string, any>;
+    regionTag?: string | null;
+    difficultyLevel: number;
+    createdAt?: string;
+}
 export interface CognitiveScore {
     id: string;
     patientId: string;
