@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  }
+}
+
+/* Accessibility: Font Size Scalers (Vital for Elderly Dementia Patients) */
+html.font-scale-normal {
+  font-size: 16px;
+}
+
+html.font-scale-large {
+  font-size: 19px;
+}
+
+html.font-scale-xl {
+  font-size: 22px;
+}
+
+/* Accessibility: High-Contrast Mode for Visual Clarity */
+html.high-contrast {
+  --tw-bg-opacity: 1;
+  background-color: #000000 !important;
+  color: #FFFFFF !important;
+}
+
+html.high-contrast body {
+  background-color: #000000 !important;
+  color: #FFFFFF !important;
+}
+
+html.high-contrast .card,
+html.high-contrast .bg-white,
+html.high-contrast .bg-slate-50,
+html.high-contrast .bg-slate-100 {
+  background-color: #121212 !important;
+  color: #FFFFFF !important;
+  border-color: #FFFF00 !important; /* Vivid accessible yellow border */
+}
+
+html.high-contrast button,
+html.high-contrast .btn-primary {
+  border: 2px solid #FFFFFF !important;
+  font-weight: 800 !important;
+}
+
+html.high-contrast input,
+html.high-contrast select,
+html.high-contrast textarea {
+  background-color: #000000 !important;
+  color: #FFFFFF !important;
+  border: 2px solid #FFFF00 !important;
+}
+
+html.high-contrast .text-slate-500,
+html.high-contrast .text-slate-600,
+html.high-contrast .text-slate-700 {
+  color: #E2E8F0 !important;
+}
+
+html.high-contrast a {
+  color: #38BDF8 !important;
+  text-decoration: underline !important;
+}

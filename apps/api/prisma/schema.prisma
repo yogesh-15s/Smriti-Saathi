@@ -1,0 +1,295 @@
+// Prisma Schema for
+// AI-Based Cognitive Gaming and Memory Assistance Platform
+// for Elderly Dementia Patients in North Eastern Region (NER)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  PATIENT   @map("patient")
+  DOCTOR    @map("doctor")
+  CARETAKER @map("caretaker")
+}
+
+enum DementiaStage {
+  EARLY       @map("early")
+  MILD        @map("mild")
+  MODERATE    @map("moderate")
+  SEVERE      @map("severe")
+  UNSPECIFIED @map("unspecified")
+}
+
+enum ReminderType {
+  MEDICINE    @map("medicine")
+  GAME        @map("game")
+  APPOINTMENT @map("appointment")
+}
+
+enum ReminderStatus {
+  PENDING @map("pending")
+  DONE    @map("done")
+  MISSED  @map("missed")
+}
+
+enum AlertType {
+  SCORE_DROP      @map("score_drop")
+  MISSED_MEDICINE @map("missed_medicine")
+  MISSED_SESSION  @map("missed_session")
+  SOS             @map("sos")
+  LEFT_SAFE_ZONE  @map("left_safe_zone")
+}
+
+enum AlertSeverity {
+  INFO     @map("info")
+  WARNING  @map("warning")
+  CRITICAL @map("critical")
+}
+
+enum AlertStatus {
+  OPEN     @map("open")
+  REVIEWED @map("reviewed")
+}
+
+enum InviteStatus {
+  PENDING  @map("pending")
+  ACCEPTED @map("accepted")
+  REJECTED @map("rejected")
+}
+
+enum DoctorVerificationStatus {
+  PENDING_VERIFICATION @map("pending_verification")
+  VERIFIED             @map("verified")
+  REJECTED             @map("rejected")
+}
+
+// 1. Users
+model User {
+  id                String   @id @default(uuid()) @db.Uuid
+  name              String
+  email             String?  @unique
+  phone             String
+  passwordHash      String   @map("password_hash")
+  role              Role
+  preferredLanguage String   @default("en") @map("preferred_language")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  patientProfile   PatientProfile?
+  doctorProfile    DoctorProfile?
+  caretakerLinks   CaretakerLink[] @relation("CaretakerUser")
+  sentMessages     Message[]       @relation("SentMessages")
+  receivedMessages Message[]       @relation("ReceivedMessages")
+  uploadedPhotos   FamilyPhoto[]   @relation("UploadedFamilyPhotos")
+  sentCaretakerMsg CaretakerMessage[] @relation("SentCaretakerMessages")
+
+  @@map("users")
+}
+
+// 2. Doctor Profiles (with registration/license number)
+model DoctorProfile {
+  id                  String                   @id @default(uuid()) @db.Uuid
+  userId              String                   @unique @map("user_id") @db.Uuid
+  licenseNumber       String                   @map("license_number")
+  hospitalAffiliation String?                  @map("hospital_affiliation")
+  specialization      String?                  @default("Geriatric Psychiatry / Neurology")
+  verificationStatus  DoctorVerificationStatus @default(PENDING_VERIFICATION) @map("verification_status")
+  createdAt           DateTime                 @default(now()) @map("created_at")
+
+  user                User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignedPatients    PatientProfile[]         @relation("DoctorPatients")
+
+  @@map("doctor_profiles")
+}
+
+// 3. Patient Profiles
+model PatientProfile {
+  id               String        @id @default(uuid()) @db.Uuid
+  userId           String        @unique @map("user_id") @db.Uuid
+  dateOfBirth      DateTime?     @map("date_of_birth")
+  dementiaStage    DementiaStage @default(UNSPECIFIED) @map("dementia_stage")
+  assignedDoctorId String?       @map("assigned_doctor_id") @db.Uuid
+  emergencyContact String        @map("emergency_contact")
+  inviteCode       String?       @unique @map("invite_code")
+  safeZoneRadiusMeters Int?        @default(500) @map("safe_zone_radius_meters")
+  homeLatitude     Float?        @default(26.1445) @map("home_latitude")
+  homeLongitude    Float?        @default(91.7362) @map("home_longitude")
+  createdAt        DateTime      @default(now()) @map("created_at")
+
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignedDoctor   DoctorProfile? @relation("DoctorPatients", fields: [assignedDoctorId], references: [id], onDelete: SetNull)
+
+  // Relations to operational patient data
+  caretakerLinks   CaretakerLink[]
+  reminders        Reminder[]
+  gameSessions     GameSession[]
+  cognitiveScores  CognitiveScore[]
+  alerts           Alert[]
+  messages         Message[]
+  familyPhotos     FamilyPhoto[]
+  patientNotes     PatientNote[]
+  patientContacts  PatientContact[]
+  caretakerMessages CaretakerMessage[]
+
+  @@map("patient_profiles")
+}
+
+// 4. Caretaker Links
+model CaretakerLink {
+  id           String       @id @default(uuid()) @db.Uuid
+  caretakerId  String       @map("caretaker_id") @db.Uuid
+  patientId    String       @map("patient_id") @db.Uuid
+  relationship String       @default("Family Member / Guardian")
+  inviteStatus InviteStatus @default(ACCEPTED) @map("invite_status")
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  caretaker    User           @relation("CaretakerUser", fields: [caretakerId], references: [id], onDelete: Cascade)
+  patient      PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@unique([caretakerId, patientId])
+  @@map("caretaker_links")
+}
+
+// 5. Reminders
+model Reminder {
+  id            String         @id @default(uuid()) @db.Uuid
+  patientId     String         @map("patient_id") @db.Uuid
+  type          ReminderType
+  title         String
+  description   String?
+  scheduledTime DateTime       @map("scheduled_time")
+  status        ReminderStatus @default(PENDING)
+  createdAt     DateTime       @default(now()) @map("created_at")
+
+  patient       PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@map("reminders")
+}
+
+// 6. Game Sessions
+model GameSession {
+  id              String   @id @default(uuid()) @db.Uuid
+  patientId       String   @map("patient_id") @db.Uuid
+  gameType        String   @map("game_type")
+  score           Int
+  difficultyLevel Int      @default(1) @map("difficulty_level")
+  durationSeconds Int      @map("duration_seconds")
+  playedAt        DateTime @default(now()) @map("played_at")
+
+  patient         PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@map("game_sessions")
+}
+
+// 7. Cognitive Scores (for trend charts)
+model CognitiveScore {
+  id             String   @id @default(uuid()) @db.Uuid
+  patientId      String   @map("patient_id") @db.Uuid
+  score          Float
+  assessmentType String   @map("assessment_type")
+  recordedAt     DateTime @default(now()) @map("recorded_at")
+
+  patient        PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@map("cognitive_scores")
+}
+
+// 8. Alerts
+model Alert {
+  id        String        @id @default(uuid()) @db.Uuid
+  patientId String        @map("patient_id") @db.Uuid
+  type      AlertType
+  severity  AlertSeverity @default(WARNING)
+  status    AlertStatus   @default(OPEN)
+  createdAt DateTime      @default(now()) @map("created_at")
+
+  patient   PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@map("alerts")
+}
+
+// 9. Messages (Doctor <-> Caretaker Communication for a Patient)
+model Message {
+  id         String   @id @default(uuid()) @db.Uuid
+  senderId   String   @map("sender_id") @db.Uuid
+  receiverId String   @map("receiver_id") @db.Uuid
+  patientId  String?  @map("patient_id") @db.Uuid
+  content    String
+  sentAt     DateTime @default(now()) @map("sent_at")
+
+  sender     User            @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver   User            @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+  patient    PatientProfile? @relation(fields: [patientId], references: [id], onDelete: SetNull)
+
+  @@map("messages")
+}
+
+// 10. Family Photos (Memory Support Album & "On this day")
+model FamilyPhoto {
+  id           String    @id @default(uuid()) @db.Uuid
+  patientId    String    @map("patient_id") @db.Uuid
+  uploadedBy   String    @map("uploaded_by") @db.Uuid
+  photoUrl     String    @map("photo_url")
+  personName   String    @map("person_name")
+  relationship String
+  caption      String
+  dateOfMemory String?   @map("date_of_memory")
+  uploadedAt   DateTime  @default(now()) @map("uploaded_at")
+
+  patient      PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  uploader     User           @relation("UploadedFamilyPhotos", fields: [uploadedBy], references: [id], onDelete: Cascade)
+
+  @@map("family_photos")
+}
+
+// 11. Patient Voice Notes ("Record a thought")
+model PatientNote {
+  id              String   @id @default(uuid()) @db.Uuid
+  patientId       String   @map("patient_id") @db.Uuid
+  audioUrl        String   @map("audio_url")
+  transcribedText String?  @map("transcribed_text")
+  durationSeconds Int?     @map("duration_seconds")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  patient         PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@map("patient_notes")
+}
+
+// 12. Patient Contacts (One-tap call shortcuts - max 3 enforced)
+model PatientContact {
+  id           String   @id @default(uuid()) @db.Uuid
+  patientId    String   @map("patient_id") @db.Uuid
+  name         String
+  relationship String
+  phoneNumber  String   @map("phone_number")
+  photoUrl     String?  @map("photo_url")
+  displayOrder Int      @default(0) @map("display_order")
+
+  patient      PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@map("patient_contacts")
+}
+
+// 13. Caretaker Messages (Voice notes / photos sent to patient)
+model CaretakerMessage {
+  id          String    @id @default(uuid()) @db.Uuid
+  caretakerId String    @map("caretaker_id") @db.Uuid
+  patientId   String    @map("patient_id") @db.Uuid
+  type        String    // 'voice' | 'photo'
+  contentUrl  String    @map("content_url")
+  caption     String?
+  sentAt      DateTime  @default(now()) @map("sent_at")
+  viewedAt    DateTime? @map("viewed_at")
+
+  patient     PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  caretaker   User           @relation("SentCaretakerMessages", fields: [caretakerId], references: [id], onDelete: Cascade)
+
+  @@map("caretaker_messages")
+}

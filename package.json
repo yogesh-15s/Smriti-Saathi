@@ -1,0 +1,31 @@
+{
+  "name": "ner-dementia-platform",
+  "version": "1.0.0",
+  "description": "AI-Based Cognitive Gaming and Memory Assistance Platform for Elderly Dementia Patients in North Eastern Region (NER)",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev --workspace=apps/api\" \"npm run dev --workspace=apps/web\"",
+    "dev:api": "npm run dev --workspace=apps/api",
+    "dev:web": "npm run dev --workspace=apps/web",
+    "build": "npm run build --workspaces",
+    "db:generate": "npm run db:generate --workspace=apps/api",
+    "db:push": "npm run db:push --workspace=apps/api"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "keywords": [
+    "dementia",
+    "cognitive-gaming",
+    "elderly-care",
+    "accessibility",
+    "north-eastern-region",
+    "healthcare"
+  ],
+  "author": "",
+  "license": "ISC"
+}
